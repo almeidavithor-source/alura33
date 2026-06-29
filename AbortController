@@ -1,0 +1,57 @@
+// Variável global (ou de escopo do componente) para guardar o controle da requisição atual
+let leituraAbortController = null;
+
+async function executarLeitura() {
+  // 1. Se já existir uma leitura em andamento, cancela a anterior imediatamente
+  if (leituraAbortController) {
+    leituraAbortController.abort();
+  }
+
+  // 2. Cria um novo controller para a leitura atual
+  leituraAbortController = new AbortController();
+  const { signal } = leituraAbortController;
+
+  // Opcional: Feedback visual de carregamento (ex: desabilitar botão ou mostrar spinner)
+  definirEstadoCarregando(true);
+
+  try {
+    // 3. Passa o 'signal' para a requisição (fetch, axios, etc.)
+    const resposta = await fetch('https://api.exemplo.com/dados-leitura', { signal });
+    
+    if (!resposta.ok) throw new Error('Falha na requisição');
+    
+    const dados = await resposta.json();
+    
+    // 4. Renderiza ou manipula os dados com a certeza de que são os mais recentes
+    atualizarInterface(dados);
+
+  } catch (erro) {
+    // 5. Trata o cancelamento de forma isolada para não quebrar a aplicação
+    if (erro.name === 'AbortError') {
+      console.log('Leitura anterior cancelada porque uma nova foi iniciada.');
+    } else {
+      console.error('Erro real na leitura:', erro);
+      exibirMensagemErro('Não foi possível carregar os dados.');
+    }
+  } finally {
+    // 6. Limpa o controller apenas se ele ainda for o controller desta execução
+    // Isso evita limpar um controller novo que tenha sido criado por um clique ultra-rápido
+    if (leituraAbortController?.signal === signal) {
+      leituraAbortController = null;
+      definirEstadoCarregando(false);
+    }
+  }
+}
+
+// Funções auxiliares fictícias para o exemplo
+function atualizarInterface(dados) {
+  document.getElementById('resultado').innerText = JSON.stringify(dados);
+}
+
+function definirEstadoCarregando(estaCarregando) {
+  const botao = document.getElementById('btn-leitura');
+  botao.innerText = estaCarregando ? 'Lendo...' : 'Iniciar Leitura';
+}
+
+// Vincula a função ao evento de clique do botão
+document.getElementById('btn-leitura').addEventListener('click', executarLeitura);
